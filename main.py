@@ -1,3 +1,4 @@
+from collections import deque
 import discord
 import os
 from discord import voice_client
@@ -8,11 +9,24 @@ from discord.utils import get
 from discord import FFmpegPCMAudio
 from discord import TextChannel
 from youtube_dl import YoutubeDL
+from queue import Queue
 
 load_dotenv()
 client = commands.Bot(command_prefix='.')  # prefix our commands with '.'
 
 players = {}
+queue = Queue()
+#def remFromQ(number):
+
+def is_connected(ctx):
+    voice_client = get(ctx.bot.voice_clients, guild=ctx.guild)
+    return voice_client and voice_client.is_connected()
+def is_playing(ctx):
+    voice_client = get(ctx.bot.voice_clients, guild=ctx.guild)
+    return voice_client.is_playing()
+
+def addToQ(url):
+    queue.put(url)
 
 
 @client.event  # check if bot is ready
@@ -38,11 +52,14 @@ async def join(ctx):
 @client.command()
 async def play(ctx, url):
     YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': 'True'}
-    FFMPEG_OPTIONS = {
-        'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-    voice = get(client.voice_clients, guild=ctx.guild)
+    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+    
 
-    if not voice.is_playing():
+    if not is_connected(ctx):
+        await ctx.send(':slight_smile:')
+        await join(ctx)
+    voice = get(client.voice_clients, guild=ctx.guild)
+    if not is_playing(ctx):
         with YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
         URL = info['url']
@@ -52,8 +69,11 @@ async def play(ctx, url):
 
 # check if the bot is already playing
     else:
-        await ctx.send("Bot is already playing")
-        return
+        addToQ(url)
+        print(queue(0))
+
+
+
 
 
 # command to resume voice if it is paused
