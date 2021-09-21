@@ -10,21 +10,17 @@ from discord.utils import get
 from discord import FFmpegPCMAudio
 from discord import TextChannel
 from youtube_dl import YoutubeDL
+from urllib.parse import urlparse 
+from urllib.parse import parse_qs
 import validators
+import subprocess
 
 load_dotenv()
 client = commands.Bot(command_prefix='.')  # prefix our commands with '.'
 
 players = {}
 q = []
-"""
-def play_next(ctx, source):
-    if len() >= 1:
-        del q[0]
-        voice = get(client.voice_clients, guild=ctx.guild)
-        voice.play(discord.FFmpegPCMAudio(source=source, after=lambda e: play_next(ctx)))
-        asyncio.run_coroutine_threadsafe(ctx.send("No more songs in q."))
-"""
+
 #def remFromQ(number):
 
 def is_connected(ctx):
@@ -37,6 +33,13 @@ def is_playing(ctx):
 
 def addToQ(url):
     q.append(url)
+
+def is_playlist(url):
+    parsed = urlparse(url)
+    captured_value = parse_qs(parsed.query)
+    if 'list' in captured_value:
+        output = subprocess.run(os.system('youtube-dl -j --flat-playlist '+url), capture_output=True)
+
 
 def checkQ(ctx, voice):
     YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': 'True'}
@@ -80,29 +83,32 @@ async def join(ctx):
 async def play(ctx, url):
     YDL_OPTIONS = {'format': 'bestaudio'}
     FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-
     if not validators.url(url):
         await ctx.send('Not a valid URL')
-    os.system('youtube-dl -j --flat-playlist '+url)
+        return
+    
+    
     if not is_connected(ctx):
         await ctx.send(':slight_smile:')
         await join(ctx)
     voice = get(client.voice_clients, guild=ctx.guild)
     print(url)
+    is_playlist(url)
     if not is_playing(ctx):
         with YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
         URL = info['url']
         
-    voice.play(FFmpegPCMAudio(URL, **FFMPEG_OPTIONS), after = lambda e: checkQ(ctx, voice))
-    voice.is_playing()
-    await ctx.send('Bot is playing')
+        voice.play(FFmpegPCMAudio(URL, **FFMPEG_OPTIONS), after = lambda e: checkQ(ctx, voice))
+        voice.is_playing()
+        await ctx.send('Bot is playing')
+
+
 # check if the bot is already playing
     else:
         addToQ(url)
         print(type(q), type(ctx))
         print(q)
-
 
 
 @client.command()
