@@ -1,4 +1,5 @@
 
+from urllib.request import url2pathname
 import discord
 import os
 import asyncio
@@ -14,6 +15,7 @@ from urllib.parse import urlparse
 from urllib.parse import parse_qs
 import validators
 import subprocess
+import spotipy
 
 load_dotenv()
 client = commands.Bot(command_prefix='.')  # prefix our commands with '.'
@@ -35,16 +37,31 @@ def is_playing(ctx):
     return voice_client.is_playing()
 
 
-def addToQueue(url):
-    musicQueue.append(url)
-
-
 def is_playlist(url):
     parsed = urlparse(url)
     captured_value = parse_qs(parsed.query)
     if 'list' in captured_value:
         output = subprocess.run(
             os.system('youtube-dl -j --flat-playlist '+url), capture_output=True)
+def clearPlaylist():
+    musicQueue.clear()
+def addToQueue(url):
+    YDL_OPTIONS = {'format': 'bestaudio'}
+
+    with YoutubeDL(YDL_OPTIONS) as ydl:
+        info = ydl.extract_info(url, download=False)
+    if not "entries" in info:
+        musicQueue.append(url)
+    else:
+        for video in info["entries"]:
+
+            if not video:
+                print("ERROR: Unable to get info. Continuing...")
+                continue
+
+            musicQueue.append(video.get("webpage_url"))
+
+
 
 
 async def playQueue(ctx, voice):
@@ -149,14 +166,15 @@ async def stop(ctx):
 
 # command to clear channel messages
 @client.command()
-async def clear(ctx, amount=5):
-    await ctx.channel.purge(limit=amount)
-    await ctx.send("Messages have been cleared")
+async def clear(ctx):
+    clearPlaylist()
+    await ctx.send("Queue cleared")
 
 
 @client.command()
 async def leave(ctx):
     if (ctx.voice_client):
+        clearPlaylist()
         await ctx.guild.voice_client.disconnect()  # Leave the channel
         await ctx.send('Idzem')
     else:
